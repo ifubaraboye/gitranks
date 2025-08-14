@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
+import { Analytics } from "@vercel/analytics/next"
 
 const inter = Inter({
   variable: "--font-inter",
@@ -84,6 +85,7 @@ export default function RootLayout({
               </div>
             </div>
           </nav>
+          
 
           {/* Main Content */}
           <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12">{children}</main>
@@ -97,6 +99,7 @@ export default function RootLayout({
             </div>
           </footer>
         </div>
+        <Analytics />
       </body>
     </html>
   )
