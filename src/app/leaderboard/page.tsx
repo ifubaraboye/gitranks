@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import SEO from "@/app/components/SEO"
 import {
   ChevronLeft,
   ChevronRight,
@@ -97,7 +98,8 @@ export default function LeaderboardPage() {
   const pageCount = useMemo(() => Math.ceil(Math.min(1000, total) / perPage) || 10, [total, perPage])
 
   return (
-    <div className="min-h-screen bg-blac">
+    <div className="min-h-screen">
+      <SEO title="GitRanks" description="Compare and rank GitHub profiles by contributions, stars, and community impact" image="https://gitranks.vercel.app/post.png" url="https://gitranks.vercel.app/leaderboard" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-12">

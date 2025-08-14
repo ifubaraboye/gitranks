@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { Star, GitFork, GitPullRequest, AlertCircle, Zap, ArrowRight, Github } from "lucide-react"
+import SEO from "@/app/components/SEO"
 
 type RankedUser = {
   username: string
@@ -58,6 +59,7 @@ export default function Home() {
 
   return (
     <div className="max-w-5xl mx-auto">
+      <SEO title="GitRanks" description="Compare and rank GitHub profiles by contributions, stars, and community impact" image="https://gitranks.vercel.app/post.png" url="https://gitranks.vercel.app/" />
       {/* Hero Section */}
       <div className="text-center mb-16">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-sm font-medium text-neutral-600 dark:text-neutral-400 mb-6">
