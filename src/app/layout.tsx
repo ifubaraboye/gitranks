@@ -15,10 +15,33 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 })
 
-export const metadata: Metadata = {
-  title: "GitRanks - GitHub Profile Analytics",
-  description: "Compare and rank GitHub profiles by contributions, stars, and community impact",
-}
+export const metadata = {
+  title: 'GitRanks',
+  description: 'Discover the most influential developers by followers, contributions & project impact.',
+  openGraph: {
+    title: 'GitRanks',
+    description: 'Discover the most influential developers by followers, contributions & project impact.',
+    url: 'https://gitranks.vercel.app/',
+    siteName: 'GitRanks',
+    images: [
+      {
+        url: 'https://gitranks.vercel.app/post.png',
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@0ribi',
+    title: 'GitRanks',
+    description: 'Discover the most influential developers by followers, contributions & project impact.',
+    images: ['https://gitranks.vercel.app/post.png'],
+  },
+};
+
 
 export default function RootLayout({
   children,
