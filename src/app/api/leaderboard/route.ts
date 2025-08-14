@@ -98,6 +98,7 @@ async function fetchUsersGraphQL(logins: string[]) {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    const searchUsername = searchParams.get("search");
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const perPage = 100; // fixed to 100 for consistent pagination to 1000
     const sortBy = String(searchParams.get("sortBy") || "followers") as "followers" | "publicRepos" | "contribs" | "stars" | "forks";
@@ -108,6 +109,154 @@ export async function GET(req: NextRequest) {
     const minContribs = Number(searchParams.get("minContribs") || "0");
     const minStars = Number(searchParams.get("minStars") || "0");
     const minForks = Number(searchParams.get("minForks") || "0");
+
+    // If searching for a specific username, find their rank
+    if (searchUsername) {
+      // Search for the specific user first
+      const userSearchUrl = `${GITHUB_API}/search/users?q=${encodeURIComponent(searchUsername)}&sort=followers&order=desc&per_page=1`;
+      const userSearch = await cacheGetOrSet(
+        `search:user:${searchUsername}`,
+        5 * 60 * 1000, // 5 minutes cache for user searches
+        () => fetchJson<{ total_count: number; items: Array<{ login: string; avatar_url: string; html_url: string }>; }>(userSearchUrl)
+      );
+
+      if (userSearch.items.length === 0) {
+        return NextResponse.json({ users: [], total: 0, page: 1, perPage: 1, hasNext: false, hasPrev: false });
+      }
+
+      const targetUser = userSearch.items[0];
+      
+      // Get the user's follower count to estimate their rank
+      let userFollowers = 0;
+      try {
+        const userDetails = await fetchUsersGraphQL([targetUser.login]);
+        if (userDetails && userDetails.length > 0) {
+          userFollowers = userDetails[0].followers;
+        } else {
+          // Fallback to REST API
+          const user = await fetchJson<{
+            login: string;
+            name: string | null;
+            avatar_url: string | null;
+            followers: number;
+            public_repos: number;
+            html_url: string;
+          }>(`${GITHUB_API}/users/${encodeURIComponent(targetUser.login)}`);
+          userFollowers = Number(user.followers || 0);
+        }
+      } catch {
+        // If we can't get user details, try to estimate rank from search results
+        userFollowers = 0;
+      }
+      
+      // Calculate exact rank based on follower count
+      // We'll use a more precise method to get the actual rank
+      let exactRank = 0;
+      
+      if (userFollowers > 0) {
+        // Method 1: Count users with more followers (most accurate)
+        try {
+          const moreFollowersUrl = `${GITHUB_API}/search/users?q=${encodeURIComponent(`followers:>${userFollowers}`)}&sort=followers&order=desc&per_page=1`;
+          const moreFollowersSearch = await fetchJson<{ total_count: number }>(moreFollowersUrl);
+          exactRank = Math.max(1, Number(moreFollowersSearch.total_count || 0) + 1);
+        } catch {
+          // Method 2: If that fails, try counting users with equal or more followers
+          try {
+            const equalOrMoreUrl = `${GITHUB_API}/search/users?q=${encodeURIComponent(`followers:>=${userFollowers}`)}&sort=followers&order=desc&per_page=1`;
+            const equalOrMoreSearch = await fetchJson<{ total_count: number }>(equalOrMoreUrl);
+            exactRank = Math.max(1, Number(equalOrMoreSearch.total_count || 0));
+          } catch {
+            // Method 3: Fallback to conservative estimate
+            exactRank = 1000;
+          }
+        }
+      } else {
+        // For users with 0 followers, count all users with followers > 0
+        try {
+          const allUsersUrl = `${GITHUB_API}/search/users?q=${encodeURIComponent("followers:>0")}&sort=followers&order=desc&per_page=1`;
+          const allUsersSearch = await fetchJson<{ total_count: number }>(allUsersUrl);
+          exactRank = Math.max(1, Number(allUsersSearch.total_count || 0) + 1);
+        } catch {
+          exactRank = 1000; // Conservative estimate
+        }
+      }
+      
+      // Get detailed user info
+      let userDetails;
+      try {
+        userDetails = await fetchUsersGraphQL([targetUser.login]);
+      } catch {
+        userDetails = null;
+      }
+      
+      let userData: LeaderboardUser;
+      if (userDetails && userDetails.length > 0) {
+        // GraphQL response
+        const user = userDetails[0];
+                 userData = {
+           username: user.login,
+           name: user.name,
+           avatarUrl: user.avatar_url,
+           followers: user.followers,
+           publicRepos: user.public_repos,
+           contributions: user.contributions,
+           htmlUrl: user.html_url,
+           rank: exactRank,
+         };
+      } else {
+        // Fallback to REST API
+        const user = await fetchJson<{
+          login: string;
+          name: string | null;
+          avatar_url: string | null;
+          followers: number;
+          public_repos: number;
+          html_url: string;
+        }>(`${GITHUB_API}/users/${encodeURIComponent(targetUser.login)}`);
+                 userData = {
+           username: user.login,
+           name: user.name,
+           avatarUrl: user.avatar_url,
+           followers: Number(user.followers || 0),
+           publicRepos: Number(user.public_repos || 0),
+           contributions: 0, // REST API doesn't provide this easily
+           htmlUrl: user.html_url,
+           rank: exactRank,
+         };
+      }
+      
+      // Add stars/forks if requested
+      if (includeRepoTotals) {
+        const perPageRepos = 100;
+        let pageRepos = 1;
+        let stars = 0;
+        let forks = 0;
+        while (true) {
+          const url = `${GITHUB_API}/users/${encodeURIComponent(targetUser.login)}/repos?per_page=${perPageRepos}&page=${pageRepos}&type=owner&sort=updated`;
+          const res = await fetch(url, { headers: getAuthHeaders(), cache: "no-store" });
+          if (!res.ok) break;
+          const batch = (await res.json()) as Array<{ stargazers_count: number; forks_count: number }>;
+          for (const r of batch) {
+            stars += Number(r?.stargazers_count || 0);
+            forks += Number(r?.forks_count || 0);
+          }
+          if (batch.length < perPageRepos) break;
+          pageRepos += 1;
+          if (pageRepos > 5) break; // safety cap
+        }
+        userData.totalStars = stars;
+        userData.totalForks = forks;
+      }
+      
+      return NextResponse.json({ 
+        users: [userData], 
+        total: 1, 
+        page: 1, 
+        perPage: 1, 
+        hasNext: false, 
+        hasPrev: false 
+      });
+    }
 
     // GitHub Search API returns up to 1000 results accessible via pagination
     const searchUrl = `${GITHUB_API}/search/users?q=${encodeURIComponent(

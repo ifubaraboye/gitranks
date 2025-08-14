@@ -13,6 +13,7 @@ import {
   GitFork,
   Search,
   ChevronDown,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -44,6 +45,12 @@ export default function LeaderboardPage() {
   const [hasNext, setHasNext] = useState(false)
   const [hasPrev, setHasPrev] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+
+  // Search
+  const [searchUsername, setSearchUsername] = useState<string>("")
+  const [searchResult, setSearchResult] = useState<LeaderboardUser | null>(null)
+  const [searchLoading, setSearchLoading] = useState<boolean>(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   // Filters
   const [sortBy, setSortBy] = useState<"followers" | "publicRepos" | "contribs" | "stars" | "forks">("followers")
@@ -97,6 +104,45 @@ export default function LeaderboardPage() {
 
   const pageCount = useMemo(() => Math.ceil(Math.min(1000, total) / perPage) || 10, [total, perPage])
 
+  // Search for a specific username
+  const handleSearch = async () => {
+    if (!searchUsername.trim()) return
+    
+    setSearchLoading(true)
+    setSearchError(null)
+    setSearchResult(null)
+    
+    try {
+      const params = new URLSearchParams()
+      params.set("search", searchUsername.trim())
+      params.set("sortBy", sortBy)
+      params.set("order", order)
+      params.set("minRepos", String(minRepos || 0))
+      params.set("minFollowers", String(minFollowers || 0))
+      params.set("minContribs", String(minContribs || 0))
+      if (includeRepoTotals) {
+        params.set("includeRepoTotals", "1")
+        params.set("minStars", String(minStars || 0))
+        params.set("minForks", String(minForks || 0))
+      }
+      
+      const res = await fetch(`/api/leaderboard?${params.toString()}`)
+      const data = await res.json()
+      
+      if (!res.ok) throw new Error(data?.error || "Failed to search")
+      
+      if (data.users && data.users.length > 0) {
+        setSearchResult(data.users[0])
+      } else {
+        setSearchError("User not found")
+      }
+    } catch (e: any) {
+      setSearchError(String(e?.message || e))
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <SEO title="GitRanks" description="Compare and rank GitHub profiles by contributions, stars, and community impact" image="https://gitranks.vercel.app/post.png" url="https://gitranks.vercel.app/leaderboard" />
@@ -113,6 +159,103 @@ export default function LeaderboardPage() {
             impact across the platform.
           </p>
         </div>
+
+        {/* Search Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Find Your Rank
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <Label htmlFor="searchUsername" className="sr-only">GitHub Username</Label>
+                <Input
+                  id="searchUsername"
+                  placeholder="Enter your GitHub username..."
+                  value={searchUsername}
+                  onChange={(e) => setSearchUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+              </div>
+              <Button 
+                onClick={handleSearch} 
+                disabled={!searchUsername.trim() || searchLoading}
+                className="shrink-0"
+              >
+                {searchLoading ? "Searching..." : "Search Rank"}
+              </Button>
+            </div>
+            
+            {/* Search Results */}
+            {searchResult && (
+              <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/40">
+                    <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                                     <h3 className="font-semibold text-green-800 dark:text-green-200">
+                     Found! {searchResult.username} is ranked #{searchResult.rank.toLocaleString()}
+                   </h3>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-green-700 dark:text-green-300">Followers:</span>
+                    <span className="ml-2 font-medium">{searchResult.followers.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-green-700 dark:text-green-300">Repos:</span>
+                    <span className="ml-2 font-medium">{searchResult.publicRepos.toLocaleString()}</span>
+                  </div>
+                  {searchResult.contributions && (
+                    <div>
+                      <span className="text-green-700 dark:text-green-300">Contributions:</span>
+                      <span className="ml-2 font-medium">{searchResult.contributions.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {searchResult.totalStars && (
+                    <div>
+                      <span className="text-green-700 dark:text-green-300">Stars:</span>
+                      <span className="ml-2 font-medium">{searchResult.totalStars.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+                                 <div className="mt-3">
+                   {searchResult.rank <= 1000 ? (
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={() => {
+                         // Find the page this user is on and navigate to it
+                         const userPage = Math.ceil(searchResult.rank / perPage)
+                         setPage(userPage)
+                         setSearchResult(null)
+                       }}
+                       className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/40"
+                     >
+                       View on Leaderboard
+                     </Button>
+                   ) : (
+                     <div className="text-sm text-green-600 dark:text-green-400">
+                       User is ranked beyond the top 1000. Use filters above to find similar profiles.
+                     </div>
+                   )}
+                 </div>
+              </div>
+            )}
+            
+            {searchError && (
+              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{searchError}</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
