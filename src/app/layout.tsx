@@ -92,7 +92,7 @@ export default function RootLayout({
           <footer className="border-t border-neutral-200 dark:border-neutral-800 mt-24">
             <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                Data from GitHub API
+                Data from GitHub API.
               </p>
             </div>
           </footer>
