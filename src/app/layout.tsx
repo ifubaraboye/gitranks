@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
+import Navbar from "./components/Navbar" // 1. Import your Navbar component (adjust path if needed)
 
 const inter = Inter({
   variable: "--font-inter",
@@ -52,43 +53,18 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} dark`}>
       <body className="font-sans antialiased bg-background">
-        <div className="min-h-screen">
-          {/* Navigation */}
-          <nav className="sticky top-0 z-50 border-b border-neutral-200/80 dark:border-neutral-800/80 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8">
-              <div className="flex items-center justify-between h-16">
-                <a href="/" className="text-xl font-semibold text-neutral-900 dark:text-white">
-                  GitRanks
-                </a>
-                <div className="flex items-center gap-8">
-                  <a
-                    href="/"
-                    className="text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
-                  >
-                    Compare
-                  </a>
-                  <a
-                    href="/leaderboard"
-                    className="text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
-                  >
-                    Leaderboard
-                  </a>
-                  <a
-                    href="https://github.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
-                  >
-                    GitHub ↗
-                  </a>
-                </div>
-              </div>
-            </div>
-          </nav>
-          
+        
+        {/* 2. Place the Navbar here, outside the main content wrapper */}
+        <Navbar />
 
-          {/* Main Content */}
-          <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12">{children}</main>
+        {/* This div is great for layout, like creating a sticky footer */}
+        <div className="min-h-screen">
+          {/* 
+            3. Main Content Wrapper:
+            - Add `pt-16` to push content below the 4rem (h-16) fixed navbar.
+            - The centering (`max-w-7xl mx-auto`) and padding are correct here.
+          */}
+          <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12 pt-16">{children}</main>
 
           {/* Footer */}
           <footer className="border-t border-neutral-200 dark:border-neutral-800 mt-24">
